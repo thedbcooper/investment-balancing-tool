@@ -1,2 +1,4 @@
 *.pdf
 .posit/
+*.csv
+!portfolio.csv

@@ -1,0 +1,5 @@
+Asset,Ticker,Group,Current_Value,Target_Percent,Chosen Weight for Buy
+Total US Stock Market Index,VTI,US Stocks,40739.2,70,
+Total International Stock Index,VXUS,International Stocks,13062.5,20,
+Total Bond Market,BND,Bonds,5019,10,100
+Treasury ETF,VGIT,Bonds,2000,10,0

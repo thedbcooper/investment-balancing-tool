@@ -13,15 +13,14 @@ library(rhandsontable)
 l2_adjustments <- function(delta, y) {
   n   <- length(delta)
   ord <- order(delta, decreasing = TRUE)
-  d   <- delta[ord]                      # sorted descending
+  d   <- delta[ord]
 
-  # k*: largest k s.t. sum_{i=1}^{k}(d_i - d_k) < y  [Theorem 1, eq. 5]
   k_star <- 1
-  for (k in 1:n) {
-    if (sum(d[1:k] - d[k]) < y) k_star <- k
+  for (k in seq_len(n)) {
+    if (sum(d[seq_len(k)] - d[k]) < y) k_star <- k
   }
 
-  lambda_star   <- (sum(d[1:k_star]) - y) / k_star
+  lambda_star   <- (sum(d[seq_len(k_star)]) - y) / k_star
   y_star_sorted <- pmax(d - lambda_star, 0)
 
   y_star      <- numeric(n)
@@ -36,20 +35,18 @@ l1_adjustments <- function(delta, y) {
   n       <- length(delta)
   pos_sum <- sum(pmax(delta, 0))
 
-  if (pos_sum == 0) return(rep(y / n, n))   # edge case: all negative deltas
+  if (pos_sum == 0) return(rep(y / n, n))
 
   if (y > pos_sum) {
-    # Case 1: more funds than needed to fully close all positive gaps
     epsilon <- (y - pos_sum) / n
     pmax(delta, 0) + epsilon
   } else {
-    # Case 2: the normal portfolio rebalancing case (Σδᵢ = y so Σδᵢ⁺ ≥ y)
     alpha <- y / pos_sum
     alpha * pmax(delta, 0)
   }
 }
 
-# ── Shared pie chart helper ───────────────────────────────────────────────────
+# ── Shared helpers ────────────────────────────────────────────────────────────
 make_pie <- function(labels, values, title) {
   plot_ly(
     labels        = labels,
@@ -57,7 +54,7 @@ make_pie <- function(labels, values, title) {
     type          = "pie",
     sort          = FALSE,
     textinfo      = "label+percent",
-    hovertemplate = "%{label}<br>$%{value:,.0f}<extra></extra>"
+    hovertemplate = "%{label}<br>$%{value:,.0f}<br>%{percent}<extra></extra>"
   ) |>
     layout(
       title  = list(text = title, font = list(size = 15)),
@@ -67,8 +64,6 @@ make_pie <- function(labels, values, title) {
     config(displayModeBar = FALSE)
 }
 
-# ── Shared DT helper — accepts already-renamed df, formats currency + pct ─────
-# currency_cols and pct_cols must match the renamed column names passed in
 fmt_dt <- function(df_renamed, currency_cols, pct_cols) {
   DT::datatable(
     df_renamed,
@@ -79,29 +74,42 @@ fmt_dt <- function(df_renamed, currency_cols, pct_cols) {
     formatPercentage(pct_cols, digits = 2)
 }
 
-# ── Method metadata lookup ────────────────────────────────────────────────────
-# Maps radio button value → display strings and column names used in results df
+first_group_target <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) 0 else x[[1]]
+}
+
+safe_share <- function(value, total, n_items) {
+  ifelse(total > 0, value / total, 1 / n_items)
+}
+
 method_info <- list(
   l1 = list(
     title       = "ℓ₁ Solution — Proportional allocation (Theorem 2)",
-    description = "Minimises sum of absolute deviations from targets. Deflates all positive naive adjustments by α = y / Σδᵢ⁺ (case 2), or adds surplus evenly when y > Σδᵢ⁺ (case 1).",
-    value_col   = "L1_Value_After",
-    buy_col     = "L1_Buys",
-    pct_col     = "L1_Final_Pct"
+    description = "Minimises sum of absolute deviations from group targets. Each group's buy amount is then split across its assets using the chosen buy weights, which default to current within-group weights.",
+    group_value_col = "L1_Group_Value_After",
+    value_col       = "L1_Value_After",
+    buy_col         = "L1_Buys",
+    group_pct_col   = "L1_Group_Final_Pct",
+    pct_col         = "L1_Final_Pct"
   ),
   l2 = list(
     title       = "ℓ₂ Solution — Threshold allocation (Theorem 1)",
-    description = "Minimises sum of squared deviations from targets. Adds only to the k* assets with the largest naive adjustments, via threshold λ* = (Σᵢ₌₁ᵏ* δᵢ − y) / k*.",
-    value_col   = "L2_Value_After",
-    buy_col     = "L2_Buys",
-    pct_col     = "L2_Final_Pct"
+    description = "Minimises sum of squared deviations from group targets. Each group's buy amount is then split across its assets using the chosen buy weights, which default to current within-group weights.",
+    group_value_col = "L2_Group_Value_After",
+    value_col       = "L2_Value_After",
+    buy_col         = "L2_Buys",
+    group_pct_col   = "L2_Group_Final_Pct",
+    pct_col         = "L2_Final_Pct"
   ),
   sell = list(
-    title       = "Full Rebalance (With Selling) — Naive adjustments in full",
-    description = "Reference only: the traditional buy-and-sell rebalance to exact targets.",
-    value_col   = "Target_Value",
-    buy_col     = "Naive_Adj",
-    pct_col     = NULL
+    title       = "Full Rebalance (With Selling) — Group targets met exactly",
+    description = "Reference only: buy and sell at the group level to hit target group weights exactly, then distribute each group's trades across its assets using the chosen buy weights.",
+    group_value_col = "Group_Target_Value",
+    value_col       = "Target_Value",
+    buy_col         = "Naive_Adj",
+    group_pct_col   = "Group_Target_Percent",
+    pct_col         = "Final_Pct"
   )
 )
 
@@ -113,42 +121,49 @@ ui <- page_sidebar(
     base_font  = font_google("Inter")
   ),
 
-  tags$head(tags$style(HTML("
-    .method-desc { font-size: 0.85rem; color: #6c757d; margin-bottom: 1rem; }
-    .total-row   { font-size: 0.85rem; color: #495057; padding: 6px 4px 2px; }
-    .total-row strong { color: #212529; }
-    .min-buy-btn {
-      width: 100%;
-      text-align: left;
-      padding: 0.75rem 1rem;
-      border: 1px solid #198754;
-      border-radius: 0.5rem;
-      background: #f8fff9;
-      color: #198754;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .min-buy-btn:hover {
-      background: #1eac41;
-    }
-    .min-buy-label {
-      display: block;
-      font-size: 0.8rem;
-      margin-bottom: 0.25rem;
-    }
-    .min-buy-value {
-      display: block;
-      font-size: 1.1rem;
-    }
+  tags$head(tags$style(HTML("\
+    .method-desc { font-size: 0.85rem; color: #6c757d; margin-bottom: 1rem; }\
+    .total-row   { font-size: 0.85rem; color: #495057; padding: 6px 4px 2px; }\
+    .total-row strong { color: #212529; }\
+    .min-buy-btn {\
+      width: 100%;\
+      text-align: left;\
+      padding: 0.75rem 1rem;\
+      border: 1px solid #198754;\
+      border-radius: 0.5rem;\
+      background: #f8fff9;\
+      color: #198754;\
+      font-weight: 600;\
+      cursor: pointer;\
+    }\
+    .min-buy-btn:hover {\
+      background: #198754;\
+    }\
+    .min-buy-label {\
+      display: block;\
+      font-size: 0.8rem;\
+      margin-bottom: 0.25rem;\
+    }\
+    .min-buy-value {\
+      display: block;\
+      font-size: 1.1rem;\
+    }\
+    .warning-note {\
+      color: #dc3545;\
+      font-weight: 600;\
+      font-size: 0.85rem;\
+      margin-bottom: 0.35rem;\
+    }\
   "))),
 
-  # ── Sidebar ────────────────────────────────────────────────────────────────
   sidebar = sidebar(
     width = 290,
 
-    fileInput("upload_csv", "Upload CSV",
-              accept      = ".csv",
-              placeholder = "Asset, Ticker, Current_Value, Target_Percent"),
+    fileInput(
+      "upload_csv", "Upload CSV",
+      accept      = ".csv",
+      placeholder = "Asset, Ticker, Group, Current_Value, Target_Percent, Chosen Weight for Buy"
+    ),
 
     numericInput("new_funds", "Total New Buy Amount ($):", value = 3000, min = 0),
 
@@ -156,67 +171,57 @@ ui <- page_sidebar(
 
     hr(),
 
-    # Method selector — ℓ₁ is the recommended default (buy-only, ℓ₁-optimal)
     radioButtons(
       "method", "Rebalancing Method:",
       choices = c(
         "ℓ₁ — Proportional (Theorem 2)" = "l1",
         "ℓ₂ — Threshold (Theorem 1)"    = "l2",
-        "Full Rebalance (With Selling)"  = "sell"
+        "Full Rebalance (With Selling)" = "sell"
       ),
       selected = "l1"
     ),
 
     hr(),
 
+    helpText("Rows in the same group share one target percent. Repeat the same target on each row in that group."),
+    helpText("Chosen Weight for Buy is optional and works within each group. Leave it blank to use the current within-group weight based on value."),
     helpText("Edit the asset table directly. Use the table context menu to insert or remove rows."),
     uiOutput("target_warning")
   ),
 
-  # ── Main panel ─────────────────────────────────────────────────────────────
   navset_card_underline(
     id = "main_tabs",
 
-    # ── Tab 1: Input data ───────────────────────────────────────────────────
     nav_panel(
       "Input Data",
       card_body(
-        rHandsontableOutput("input_table"),
+        rhandsontable::rHandsontableOutput("input_table"),
         tags$p(
           class = "text-muted small mt-2 mb-0",
-          "Double-click to edit cells. Right-click a row to add or remove assets."
+          "Double-click to edit cells. Right-click a row to add or remove assets. Pie charts and target checks are now based on groups, not individual assets. Chosen Weight for Buy is used only to split each group's trades across its assets."
         )
       )
     ),
 
-    # ── Tab 2: Rebalance analysis ───────────────────────────────────────────
     nav_panel(
       "Rebalance Analysis",
-
-      # Dynamic title + description for the selected method
       uiOutput("method_header"),
-
-      # ── Current vs Rebalanced columns — each has pie + table + totals ────
       layout_columns(
         col_widths = c(6, 6),
 
-        # Current portfolio column
         card(
-          card_header("Current"),
+          card_header("Current by Group"),
           plotlyOutput("pie_current", height = "300px"),
           card_body(
-            DT::DTOutput("table_current"),
-            uiOutput("totals_current")
+            DT::DTOutput("table_current")
           )
         ),
 
-        # Rebalanced portfolio column
         card(
-          card_header("Rebalanced"),
+          card_header("Rebalanced by Group"),
           plotlyOutput("pie_rebalanced", height = "300px"),
           card_body(
-            DT::DTOutput("table_rebalanced"),
-            uiOutput("totals_rebalanced")
+            DT::DTOutput("table_rebalanced")
           )
         )
       )
@@ -228,9 +233,14 @@ ui <- page_sidebar(
 server <- function(input, output, session) {
 
   clean_input_data <- function(df) {
-    expected <- c("Asset", "Ticker", "Current_Value", "Target_Percent")
+    required <- c("Asset", "Ticker", "Current_Value", "Target_Percent")
+    expected <- c("Asset", "Ticker", "Group", "Current_Value", "Target_Percent", "Chosen Weight for Buy")
 
-    df <- as.data.frame(df, stringsAsFactors = FALSE)
+    df <- as.data.frame(df, stringsAsFactors = FALSE, check.names = FALSE)
+
+    if (!"Group" %in% names(df) && all(required %in% names(df))) {
+      df$Group <- df$Asset
+    }
 
     for (col in setdiff(expected, names(df))) {
       df[[col]] <- NA
@@ -239,14 +249,19 @@ server <- function(input, output, session) {
     df <- df[, expected, drop = FALSE]
     df$Asset <- trimws(ifelse(is.na(df$Asset), "", as.character(df$Asset)))
     df$Ticker <- trimws(ifelse(is.na(df$Ticker), "", as.character(df$Ticker)))
+    df$Group <- trimws(ifelse(is.na(df$Group), "", as.character(df$Group)))
+    df$Group <- ifelse(df$Group == "", df$Asset, df$Group)
     df$Current_Value <- suppressWarnings(as.numeric(df$Current_Value))
     df$Target_Percent <- suppressWarnings(as.numeric(df$Target_Percent))
+    df[["Chosen Weight for Buy"]] <- suppressWarnings(as.numeric(df[["Chosen Weight for Buy"]]))
 
     keep_row <-
       df$Asset != "" |
       df$Ticker != "" |
+      df$Group != "" |
       !is.na(df$Current_Value) |
-      !is.na(df$Target_Percent)
+      !is.na(df$Target_Percent) |
+      !is.na(df[["Chosen Weight for Buy"]])
 
     df <- df[keep_row, , drop = FALSE]
     df$Current_Value[is.na(df$Current_Value)] <- 0
@@ -255,39 +270,90 @@ server <- function(input, output, session) {
     df
   }
 
+  load_starting_data <- function(path = "portfolio.csv") {
+    expected <- c("Asset", "Ticker", "Group", "Current_Value", "Target_Percent", "Chosen Weight for Buy")
+
+    if (!file.exists(path)) {
+      return(as.data.frame(setNames(replicate(length(expected), logical(0), simplify = FALSE), expected), check.names = FALSE))
+    }
+
+    read_csv(path, show_col_types = FALSE) |>
+      clean_input_data()
+  }
+
   values <- reactiveValues(
-    data = data.frame(
-      Asset          = c("Total US Stock Market Index", "Total International Stock Index", "Bonds"),
-      Ticker         = c("VTI", "VXUS", "BND"),
-      Current_Value  = c(40739.2, 13062.5, 7019),
-      Target_Percent = c(70, 20, 10),
-      stringsAsFactors = FALSE
-    )
+    data = load_starting_data()
   )
 
-  # CSV upload — replace table contents if columns match expected schema
   observeEvent(input$upload_csv, {
     req(input$upload_csv)
     uploaded <- read_csv(input$upload_csv$datapath, show_col_types = FALSE)
-    expected <- c("Asset", "Ticker", "Current_Value", "Target_Percent")
-    if (all(expected %in% names(uploaded))) {
-      values$data <- uploaded |> select(all_of(expected)) |> clean_input_data()
+    required <- c("Asset", "Ticker", "Current_Value", "Target_Percent")
+
+    if (all(required %in% names(uploaded))) {
+      values$data <- clean_input_data(uploaded)
     }
   })
 
-  # Warn if target %s don't sum to 100
   output$target_warning <- renderUI({
-    pct_sum <- sum(as.numeric(values$data$Target_Percent), na.rm = TRUE)
-    if (abs(pct_sum - 100) > 0.01) {
-      tags$p(
-        style = "color: #dc3545; font-weight: bold; font-size: 0.85rem;",
-        paste0("⚠ Target % sum = ", round(pct_sum, 2), "% (must be 100)")
+    df <- clean_input_data(values$data)
+
+    if (nrow(df) == 0) {
+      return(NULL)
+    }
+
+    group_checks <- df |>
+      summarize(
+        Group_Target_Percent = first_group_target(Target_Percent),
+        Distinct_Targets     = n_distinct(round(Target_Percent, 8)),
+        .by = Group
+      )
+
+    warnings <- character()
+
+    if (any(df[["Chosen Weight for Buy"]] < 0, na.rm = TRUE)) {
+      warnings <- c(
+        warnings,
+        "Chosen Weight for Buy must be non-negative. Leave it blank to use the current within-group weight based on value."
       )
     }
+
+    inconsistent_groups <- group_checks |>
+      filter(Distinct_Targets > 1) |>
+      pull(Group)
+
+    if (length(inconsistent_groups) > 0) {
+      warnings <- c(
+        warnings,
+        paste0(
+          "Groups with inconsistent target values across rows: ",
+          paste(inconsistent_groups, collapse = ", "),
+          ". Only one target should be used per group."
+        )
+      )
+    }
+
+    pct_sum <- sum(group_checks$Group_Target_Percent, na.rm = TRUE)
+    if (abs(pct_sum - 100) > 0.01) {
+      warnings <- c(
+        warnings,
+        paste0("Group target % sum = ", round(pct_sum, 2), "% (must be 100)")
+      )
+    }
+
+    if (length(warnings) == 0) {
+      return(NULL)
+    }
+
+    tagList(
+      lapply(warnings, function(note) {
+        tags$p(class = "warning-note", note)
+      })
+    )
   })
 
-  output$input_table <- renderRHandsontable({
-    rhandsontable(
+  output$input_table <- rhandsontable::renderRHandsontable({
+    rhandsontable::rhandsontable(
       values$data,
       rowHeaders = NULL,
       useTypes = TRUE,
@@ -296,63 +362,144 @@ server <- function(input, output, session) {
       manualRowMove = TRUE,
       minSpareRows = 1
     ) |>
-      hot_col("Asset", type = "text") |>
-      hot_col("Ticker", type = "text") |>
-      hot_col("Current_Value", type = "numeric", format = "0,0.00") |>
-      hot_col("Target_Percent", type = "numeric", format = "0,0.00")
+      rhandsontable::hot_col("Asset", type = "text") |>
+      rhandsontable::hot_col("Ticker", type = "text") |>
+      rhandsontable::hot_col("Group", type = "text") |>
+      rhandsontable::hot_col("Current_Value", type = "numeric", format = "0,0.00") |>
+      rhandsontable::hot_col("Target_Percent", type = "numeric", format = "0,0.00") |>
+      rhandsontable::hot_col("Chosen Weight for Buy", type = "numeric", format = "0,0.00")
   })
 
   observeEvent(input$input_table, {
-    values$data <- hot_to_r(input$input_table) |> clean_input_data()
+    values$data <- rhandsontable::hot_to_r(input$input_table) |>
+      clean_input_data()
   })
 
-
-
-  # ── Core calculations ──────────────────────────────────────────────────────
   results <- reactive({
-    df <- values$data
-    df$Current_Value  <- as.numeric(df$Current_Value)
-    df$Target_Percent <- as.numeric(df$Target_Percent) / 100
+    df <- clean_input_data(values$data)
+    req(nrow(df) > 0)
 
-    x  <- sum(df$Current_Value)   # current portfolio value
-    y  <- input$new_funds         # new funds to invest
-    xf <- x + y                   # final portfolio value
+    df$Current_Value <- as.numeric(df$Current_Value)
+    df$Target_Percent <- as.numeric(df$Target_Percent)
+    df[["Chosen Weight for Buy"]] <- as.numeric(df[["Chosen Weight for Buy"]])
 
-    # Naive adjustments: δᵢ = pᵢ(x + y) − xᵢ  [eq. 1]
-    df$Naive_Adj <- xf * df$Target_Percent - df$Current_Value
+    x  <- sum(df$Current_Value)
+    y  <- input$new_funds
+    xf <- x + y
 
-    # Min buy to avoid any selling: max(xᵢ / pᵢ) − x
-    min_buy_no_sell <- max(0, max(df$Current_Value / df$Target_Percent, na.rm = TRUE) - x)
+    group_df <- df |>
+      summarize(
+        Group_Current_Value   = sum(Current_Value, na.rm = TRUE),
+        Group_Target_Percent  = first_group_target(Target_Percent) / 100,
+        Asset_Count           = dplyr::n(),
+        .by = Group
+      ) |>
+      mutate(
+        Group_Naive_Adj = xf * Group_Target_Percent - Group_Current_Value
+      )
 
-    # ── ℓ₁ solution (Theorem 2)
-    df$L1_Buys        <- l1_adjustments(df$Naive_Adj, y)
-    df$L1_Value_After <- df$Current_Value + df$L1_Buys
-    df$L1_Final_Pct   <- df$L1_Value_After / xf
+    zero_target_with_value <- any(
+      group_df$Group_Target_Percent <= 0 & group_df$Group_Current_Value > 0
+    )
 
-    # ── ℓ₂ solution (Theorem 1)
-    df$L2_Buys        <- l2_adjustments(df$Naive_Adj, y)
-    df$L2_Value_After <- df$Current_Value + df$L2_Buys
-    df$L2_Final_Pct   <- df$L2_Value_After / xf
+    if (zero_target_with_value) {
+      min_buy_no_sell <- Inf
+    } else if (any(group_df$Group_Target_Percent > 0)) {
+      min_buy_no_sell <- max(
+        0,
+        max(
+          group_df$Group_Current_Value[group_df$Group_Target_Percent > 0] /
+            group_df$Group_Target_Percent[group_df$Group_Target_Percent > 0],
+          na.rm = TRUE
+        ) - x
+      )
+    } else {
+      min_buy_no_sell <- 0
+    }
 
-    # Key scalars for display
-    pos_sum <- sum(pmax(df$Naive_Adj, 0))
-    alpha   <- if (y <= pos_sum) y / pos_sum else NA_real_   # NA in case 1
+    group_df <- group_df |>
+      mutate(
+        L1_Group_Buys        = l1_adjustments(Group_Naive_Adj, y),
+        L1_Group_Value_After = Group_Current_Value + L1_Group_Buys,
+        L1_Group_Final_Pct   = if (xf > 0) L1_Group_Value_After / xf else 0,
+        L2_Group_Buys        = l2_adjustments(Group_Naive_Adj, y),
+        L2_Group_Value_After = Group_Current_Value + L2_Group_Buys,
+        L2_Group_Final_Pct   = if (xf > 0) L2_Group_Value_After / xf else 0,
+        Group_Target_Value   = xf * Group_Target_Percent,
+        Group_Current_Weight = if (x > 0) Group_Current_Value / x else 0
+      )
 
-    d_sorted    <- sort(df$Naive_Adj, decreasing = TRUE)
+    pos_sum <- sum(pmax(group_df$Group_Naive_Adj, 0))
+    alpha   <- if (y <= pos_sum && pos_sum > 0) y / pos_sum else NA_real_
+
+    d_sorted    <- sort(group_df$Group_Naive_Adj, decreasing = TRUE)
     n           <- length(d_sorted)
     k_star      <- 1
-    for (k in 1:n) if (sum(d_sorted[1:k] - d_sorted[k]) < y) k_star <- k
-    lambda_star <- (sum(d_sorted[1:k_star]) - y) / k_star
+    for (k in seq_len(n)) {
+      if (sum(d_sorted[seq_len(k)] - d_sorted[k]) < y) k_star <- k
+    }
+    lambda_star <- (sum(d_sorted[seq_len(k_star)]) - y) / k_star
 
-    # Full naive rebalance (reference)
-    df$Target_Value <- xf * df$Target_Percent
+    asset_df <- df |>
+      left_join(group_df, by = "Group") |>
+      mutate(
+        Current_Weight = if (x > 0) Current_Value / x else 0,
+        Within_Group_Weight = dplyr::if_else(
+          Group_Current_Value > 0,
+          Current_Value / Group_Current_Value,
+          1 / Asset_Count
+        ),
+        Buy_Weight_Input = dplyr::if_else(
+          !is.na(.data[["Chosen Weight for Buy"]]),
+          pmax(.data[["Chosen Weight for Buy"]], 0),
+          Within_Group_Weight * 100
+        )
+      ) |>
+      mutate(
+        Buy_Weight_Total = sum(Buy_Weight_Input, na.rm = TRUE),
+        .by = Group
+      ) |>
+      mutate(
+        Buy_Weight = dplyr::if_else(
+          Buy_Weight_Total > 0,
+          Buy_Weight_Input / Buy_Weight_Total,
+          1 / Asset_Count
+        ),
+        Naive_Adj      = Group_Naive_Adj * Buy_Weight,
+        L1_Buys        = L1_Group_Buys * Buy_Weight,
+        L2_Buys        = L2_Group_Buys * Buy_Weight,
+        Target_Value   = Group_Target_Value * Buy_Weight,
+        L1_Value_After = Current_Value + L1_Buys,
+        L2_Value_After = Current_Value + L2_Buys,
+        Final_Pct      = if (xf > 0) Target_Value / xf else 0,
+        L1_Final_Pct   = if (xf > 0) L1_Value_After / xf else 0,
+        L2_Final_Pct   = if (xf > 0) L2_Value_After / xf else 0
+      )
 
-    list(df = df, alpha = alpha, lambda = lambda_star,
-         min_buy = min_buy_no_sell, x = x, xf = xf, y = y)
+    list(
+      df = asset_df,
+      group_df = group_df,
+      alpha = alpha,
+      lambda = lambda_star,
+      min_buy = min_buy_no_sell,
+      x = x,
+      xf = xf,
+      y = y
+    )
   })
 
   output$min_buy_sidebar <- renderUI({
     req(results())
+
+    if (is.infinite(results()$min_buy)) {
+      return(
+        tags$div(
+          class = "warning-note",
+          "Min buy is not available when a group with a positive current value has a 0% target."
+        )
+      )
+    }
+
     actionButton(
       "use_min_buy",
       label = HTML(paste0(
@@ -367,109 +514,81 @@ server <- function(input, output, session) {
     updateNumericInput(session, "new_funds", value = results()$min_buy)
   })
 
-  # ── Dynamic method header (title + description) ────────────────────────────
   output$method_header <- renderUI({
     meta <- method_info[[input$method]]
     tagList(
-      tags$h5(meta$title,      class = "mt-3 mb-1 fw-semibold"),
+      tags$h5(meta$title, class = "mt-3 mb-1 fw-semibold"),
       tags$p(meta$description, class = "method-desc")
     )
   })
 
-  # ── Pie charts — react to both results() and input$method ─────────────────
   output$pie_current <- renderPlotly({
     req(results())
-    df <- results()$df
+    df_group <- results()$group_df
+
     make_pie(
-      df$Asset, df$Current_Value,
-      paste0("Current  ($", format(round(results()$x), big.mark = ","), ")")
+      df_group$Group,
+      df_group$Group_Current_Value,
+      paste0("Current Groups  ($", format(round(results()$x), big.mark = ","), ")")
     )
   })
 
   output$pie_rebalanced <- renderPlotly({
     req(results())
-    df   <- results()$df
-    meta <- method_info[[input$method]]
+    df_group <- results()$group_df
+    meta     <- method_info[[input$method]]
+
     make_pie(
-      df$Asset, df[[meta$value_col]],
-      paste0("Rebalanced  ($", format(round(results()$xf), big.mark = ","), ")")
+      df_group$Group,
+      df_group[[meta$group_value_col]],
+      paste0("Rebalanced Groups  ($", format(round(results()$xf), big.mark = ","), ")")
     )
   })
 
-  # ── Current table — Asset, Ticker, Value, Current Weight, Target Weight ────
   output$table_current <- DT::renderDT({
     req(results())
     df <- results()$df
 
     df |>
-      mutate("Current Weight" = Current_Value / results()$x) |>
-      select(
+      transmute(
+        Group,
         Asset,
         Ticker,
-        "Value"          = Current_Value,
-        "Current Weight",
-        "Target Weight"  = Target_Percent
+        Value                  = Current_Value,
+        `Portfolio Weight`     = Current_Weight,
+        `Weight in Group`      = Within_Group_Weight,
+        `Group Current Weight` = Group_Current_Weight
       ) |>
       fmt_dt(
         currency_cols = "Value",
-        pct_cols      = c("Current Weight", "Target Weight")
+        pct_cols      = c("Portfolio Weight", "Weight in Group", "Group Current Weight")
       )
   })
 
-  # ── Rebalanced table — columns differ by method ────────────────────────────
   output$table_rebalanced <- DT::renderDT({
     req(results())
-    df   <- results()$df
     meta <- method_info[[input$method]]
 
-    if (input$method == "sell") {
-      # Full rebalance: show direction (Buy / Sell / Hold) and target value
-      df |>
-        mutate(
-          Direction      = case_when(
-            Naive_Adj > 0 ~ "Buy",
-            Naive_Adj < 0 ~ "Sell",
-            TRUE          ~ "Hold"
-          ),
-          "Final Weight" = Target_Value / results()$xf
-        ) |>
-        select(
-          Asset,
-          Ticker,
-          "Target Value"  = Target_Value,
-          "Final Weight",
-          "Target Weight" = Target_Percent,
-          "Buy / Sell"    = Naive_Adj,
-          Direction
-        ) |>
-        fmt_dt(
-          currency_cols = c("Target Value", "Buy / Sell"),
-          pct_cols      = c("Final Weight", "Target Weight")
-        )
-    } else {
-      # ℓ₁ or ℓ₂: show amount bought, resulting value, and resulting allocation
-      df |>
-        mutate("Final Weight" = .data[[meta$pct_col]]) |>
-        select(
-          Asset,
-          Ticker,
-          "Value After"   = !!sym(meta$value_col),
-          "Final Weight",
-          "Target Weight" = Target_Percent,
-          "Amount Bought" = !!sym(meta$buy_col)
-        ) |>
-        fmt_dt(
-          currency_cols = c("Value After", "Amount Bought"),
-          pct_cols      = c("Final Weight", "Target Weight")
-        )
-    }
+    results()$df |>
+      transmute(
+        Group,
+        Asset,
+        Ticker,
+        `Value After` = !!sym(meta$value_col),
+        `Group Final Weight` = .data[[meta$group_pct_col]],
+        `Group Target Weight` = Group_Target_Percent,
+        `Amount Bought` = !!sym(meta$buy_col)
+      ) |>
+      fmt_dt(
+        currency_cols = c("Value After", "Amount Bought"),
+        pct_cols      = c("Group Final Weight", "Group Target Weight")
+      )
   })
 
-  # ── Totals footers
-  # ── Totals footers — mirrors Python app's "Total positions / Cash" lines ───
   output$totals_current <- renderUI({
     req(results())
     total <- sum(results()$df$Current_Value)
+
     tags$div(
       class = "total-row mt-2",
       tags$strong("Total: "),
@@ -482,13 +601,30 @@ server <- function(input, output, session) {
     df          <- results()$df
     meta        <- method_info[[input$method]]
     total_after <- sum(df[[meta$value_col]])
-    funds_used  <- sum(df[[meta$buy_col]])   # total $ deployed (buy-only methods will always equal y)
+
+    if (input$method == "sell") {
+      net_trade   <- sum(df$Naive_Adj)
+      gross_trade <- sum(abs(df$Naive_Adj))
+
+      return(
+        tags$div(
+          class = "total-row",
+          tags$strong("Total: "), paste0("$", format(round(total_after, 2), big.mark = ",")),
+          tags$br(),
+          tags$strong("Net Buy: "), paste0("$", format(round(net_trade, 2), big.mark = ",")),
+          tags$br(),
+          tags$strong("Gross Trades: "), paste0("$", format(round(gross_trade, 2), big.mark = ","))
+        )
+      )
+    }
+
+    funds_used <- sum(df[[meta$buy_col]])
 
     tags$div(
-      class = "total-row mt-2",
-      tags$strong("Total: "),    paste0("$", format(round(total_after, 2), big.mark = ",")),
+      class = "total-row",
+      tags$strong("Total: "), paste0("$", format(round(total_after, 2), big.mark = ",")),
       tags$br(),
-      tags$strong("Invested: "), paste0("$", format(round(funds_used,  2), big.mark = ","))
+      tags$strong("Invested: "), paste0("$", format(round(funds_used, 2), big.mark = ","))
     )
   })
 }
