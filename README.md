@@ -9,6 +9,19 @@ This repository implements the algorithms from that paper; the implementation is
 
 ---
 
+## Why Not Differential Evolution?
+
+**Differential evolution (DE)** is a stochastic numerical optimiser that was considered as an alternative approach. It would search over candidate allocations, iteratively minimising tracking error against target weights. While capable, it was rejected in favour of the closed-form solutions for the following reasons:
+
+- **Exact optimality**: the ℓ₁ and ℓ₂ solutions are mathematically proven to be globally optimal. DE is heuristic and provides no such guarantee.
+- **Dollar amounts**: this app works in dollar values, where fractional purchases are allowed (e.g. mutual funds, dollar-based brokers). The continuous closed-form solutions are directly applicable and more precise than DE, which is better suited to discrete whole-share problems.
+- **Transparency**: each solution reduces to a single interpretable formula — a deflation factor α or threshold λ\*. DE is a black-box search with no intuitive explanation of the resulting allocation.
+- **Speed and determinism**: the analytical solutions run instantly and always produce the same result. DE requires many objective evaluations and a fixed random seed for reproducibility.
+
+DE would have an edge if whole-share constraints or per-trade fee schedules were required. Neither applies here.
+
+---
+
 ## The Problem
 
 You have a portfolio of $n$ assets with current values $x_1, \ldots, x_n$ and target proportions $p_1, \ldots, p_n$ (summing to 1). You want to invest a fixed additional amount $y > 0$ to get as close as possible to your targets, **without selling anything**.
