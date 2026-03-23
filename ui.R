@@ -3,6 +3,7 @@ ui <- page_navbar(
     bs_icon("bar-chart-steps", class = "me-2 text-primary"),
     "Portfolio Rebalancing Tool"
   ),
+  id = "nav",
   window_title = "Portfolio Rebalancing Tool",
   theme = bs_theme(
     bootswatch  = "flatly",
@@ -21,6 +22,7 @@ ui <- page_navbar(
   ),
 
   sidebar = sidebar(
+    id = "sidebar",
     width = 300,
     class = "sidebar-panel",
 
@@ -209,6 +211,7 @@ ui <- page_navbar(
             tags$ul(
               class = "mb-0",
               tags$li(tags$strong("Input Data Tab:"), " Edit assets, tickers, current values, and target percentages directly in the table. Upload a CSV file with your portfolio data."),
+              tags$li(tags$strong("Buy Orders Tab:"), " Review the calculated buy orders with a bar chart and detailed breakdown table."),
               tags$li(tags$strong("CSV Format:"), " Columns: Asset, Ticker, Group (optional), Current_Value, Target_Percent, Chosen Weight for Buy (optional). Target percentages must sum to 100%."),
               tags$li(tags$strong("Groups:"), " Assign assets to groups for aggregated analysis. Within each group, you can specify how new buys are split."),
               tags$li(tags$strong("New Funds:"), " Enter the total amount of new money to invest. The app shows the minimum amount needed to avoid selling."),

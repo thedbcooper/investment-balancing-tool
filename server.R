@@ -56,6 +56,13 @@ server <- function(input, output, session) {
     data = load_starting_data()
   )
 
+  # observeEvent(input$nav, {
+  #   toggle_sidebar(
+  #     id   = "sidebar",
+  #     open = !(input$nav == "About")
+  #   )
+  # })
+
   observeEvent(input$upload_csv, {
     req(input$upload_csv)
     uploaded <- read_csv(input$upload_csv$datapath, show_col_types = FALSE)
