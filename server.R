@@ -407,4 +407,110 @@ server <- function(input, output, session) {
       tags$strong("Invested: "), paste0("$", format(round(funds_used,  2), big.mark = ","))
     )
   })
+
+  output$buy_orders_boxes <- renderUI({
+    req(results())
+    meta <- method_info[[input$method]]
+    df   <- results()$df
+
+    buys <- df[[meta$buy_col]]
+    buying <- df[buys > 0.005, ]
+
+    total_invested <- sum(buys)
+    n_assets       <- sum(buys > 0.005)
+    biggest_buy    <- if (nrow(buying) > 0) max(buying[[meta$buy_col]]) else 0
+    biggest_ticker <- if (nrow(buying) > 0) buying$Ticker[which.max(buying[[meta$buy_col]])] else "—"
+
+    layout_columns(
+      col_widths = c(4, 4, 4),
+      value_box(
+        title    = "Total to Invest",
+        value    = paste0("$", format(round(total_invested, 2), big.mark = ",")),
+        showcase = bs_icon("cash-stack"),
+        theme    = "primary"
+      ),
+      value_box(
+        title    = "Assets Being Bought",
+        value    = n_assets,
+        showcase = bs_icon("cart-check"),
+        theme    = "success"
+      ),
+      value_box(
+        title    = paste0("Largest Purchase (", biggest_ticker, ")"),
+        value    = paste0("$", format(round(biggest_buy, 2), big.mark = ",")),
+        showcase = bs_icon("graph-up-arrow"),
+        theme    = "info"
+      )
+    )
+  })
+
+  output$buy_bar_chart <- renderPlotly({
+    req(results())
+    meta <- method_info[[input$method]]
+    df   <- results()$df
+
+    plot_df <- df |>
+      filter(.data[[meta$buy_col]] > 0.005) |>
+      mutate(
+        Label       = if_else(Ticker != "", paste0(Ticker, " — ", Asset), Asset),
+        Amount      = .data[[meta$buy_col]],
+        HoverText   = paste0(
+          "<b>", Asset, "</b> (", Ticker, ")<br>",
+          "Group: ", Group, "<br>",
+          "Buy: $", format(round(Amount, 2), big.mark = ","), "<br>",
+          "New value: $", format(round(.data[[meta$value_col]], 2), big.mark = ",")
+        )
+      ) |>
+      arrange(Amount)
+
+    n_groups <- n_distinct(plot_df$Group)
+    palette  <- RColorBrewer::brewer.pal(max(3, min(n_groups, 9)), "Set2")
+    groups   <- unique(plot_df$Group)
+    color_map <- setNames(palette[seq_along(groups)], groups)
+
+    plot_ly(
+      data        = plot_df,
+      x           = ~Amount,
+      y           = ~reorder(Label, Amount),
+      color       = ~Group,
+      colors      = color_map,
+      type        = "bar",
+      orientation = "h",
+      text        = ~paste0("$", format(round(Amount, 0), big.mark = ",")),
+      textposition = "outside",
+      hovertext   = ~HoverText,
+      hoverinfo   = "text"
+    ) |>
+      layout(
+        xaxis      = list(title = "Amount to Buy ($)", tickprefix = "$", tickformat = ",.0f"),
+        yaxis      = list(title = "", automargin = TRUE),
+        showlegend = TRUE,
+        legend     = list(title = list(text = "<b>Group</b>"), orientation = "v"),
+        margin     = list(l = 10, r = 80, t = 10, b = 50),
+        barmode    = "overlay"
+      ) |>
+      config(displayModeBar = FALSE)
+  })
+
+  output$buy_receipt_table <- DT::renderDT({
+    req(results())
+    meta <- method_info[[input$method]]
+    df   <- results()$df
+
+    df |>
+      filter(.data[[meta$buy_col]] > 0.005) |>
+      transmute(
+        Group,
+        Asset,
+        Ticker,
+        `Amount to Buy`  = .data[[meta$buy_col]],
+        `Value After`    = .data[[meta$value_col]],
+        `New Weight`     = .data[[meta$pct_col]]
+      ) |>
+      arrange(desc(`Amount to Buy`)) |>
+      fmt_dt(
+        currency_cols = c("Amount to Buy", "Value After"),
+        pct_cols      = "New Weight"
+      )
+  })
 }

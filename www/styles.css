@@ -1,49 +1,275 @@
-.method-desc {
-  font-size: 0.85rem;
-  color: #6c757d;
-  margin-bottom: 1rem;
-}
-
+/* ── Total rows in analysis tables ──────────────────────────────────────── */
 .total-row {
   font-size: 0.85rem;
   color: #495057;
   padding: 6px 4px 2px;
+  background-color: #f4f6f9;
+}
+
+a {
+  text-decoration: none;
+}
+
+/* ── Navbar ─────────────────────────────────────────────────────────────── */
+.navbar {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.navbar-brand {
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
+  color: #fff !important;
+}
+
+/* Nav items – icons + labels */
+.navbar-nav .nav-link {
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.65rem 1.4rem;
+  border-radius: 0.45rem;
+  color: rgba(255, 255, 255, 0.95) !important;
+  transition: background 0.18s, color 0.18s;
+  text-decoration: none !important;
+  border-bottom: none !important;
+}
+
+.navbar-nav .nav-link:hover,
+.navbar-nav .nav-link.active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff !important;
+  text-decoration: none !important;
+  border-bottom: none !important;
+}
+
+/* Kill any Bootstrap underline indicator bslib adds */
+.navbar-nav .nav-link::after,
+.navbar-nav .nav-link::before {
+  display: none !important;
+}
+
+/* GitHub link — target exact bslib parent to beat Bootstrap's nav-link hover */
+.bslib-nav-item a.github-nav-link,
+.bslib-nav-item a.github-nav-link:link,
+.bslib-nav-item a.github-nav-link:visited,
+.bslib-nav-item a.github-nav-link:hover,
+.bslib-nav-item a.github-nav-link:focus,
+.bslib-nav-item a.github-nav-link:active {
+  text-decoration: none !important;
+  text-decoration-line: none !important;
+  -webkit-text-decoration: none !important;
+  background-image: none !important;
+}
+
+.github-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95) !important;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+  text-decoration: none !important;
+  text-decoration-line: none !important;
+}
+
+.github-nav-link:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.6);
+  text-decoration: none !important;
+  text-decoration-line: none !important;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────────── */
+.sidebar-panel {
+  background: #ffffff;
+  border-right: 1px solid #dee2e6;
+  padding: 0 !important;
+}
+
+/* Labelled sidebar sections */
+.sidebar-section {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.sidebar-section:last-child {
+  border-bottom: none;
+}
+
+.sidebar-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6c757d;
+  margin-bottom: 0.55rem;
+  display: flex;
+  align-items: center;
+}
+
+/* Remove extra margin from shiny inputs inside sections */
+.sidebar-section .shiny-input-container {
+  margin-bottom: 0.35rem;
+}
+
+.sidebar-section .form-label,
+.sidebar-section label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+/* Help text */
+.sidebar-help .shiny-html-output,
+.sidebar-help p,
+.sidebar-help .help-block {
+  font-size: 0.78rem;
+  color: #868e96;
+  margin-bottom: 0.4rem;
+  line-height: 1.4;
+}
+
+/* Radio buttons tighter */
+.sidebar-section .radio label {
+  font-size: 0.85rem;
+  margin-bottom: 0.15rem;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card {
+  border: none;
+  border-radius: 0.6rem;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+  margin-bottom: 1rem;
+  background: #ffffff;
+}
+
+.card-header {
+  background: #fff;
+  border-bottom: 2px solid #f0f2f5;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.7rem 1rem;
+  border-radius: 0.6rem 0.6rem 0 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* ── Value boxes ────────────────────────────────────────────────────────── */
+.bslib-value-box {
+  border-radius: 0.6rem !important;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.09) !important;
+}
+
+.bslib-value-box .value-box-title {
+  font-size: 0.78rem !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+.bslib-value-box .value-box-value {
+  font-size: 1.55rem !important;
+  font-weight: 700;
+}
+
+/* ── Method description text ─────────────────────────────────────────────── */
+.method-desc {
+  font-size: 0.82rem;
+  color: #6c757d;
+  margin-bottom: 0.75rem;
+  background: #f8f9fa;
+  border-left: 3px solid #2C6BAC;
+  padding: 0.45rem 0.75rem;
+  border-radius: 0 0.35rem 0.35rem 0;
 }
 
 .total-row strong {
   color: #212529;
 }
 
+/* ── Min-buy button ─────────────────────────────────────────────────────── */
 .min-buy-btn {
   width: 100%;
   text-align: left;
-  padding: 0.75rem 1rem;
+  padding: 0.65rem 0.9rem;
   border: 1px solid #1fbb9c;
-  border-radius: 0.5rem;
-  background: #f8fff9;
-  color: #1fbb9c;
+  border-radius: 0.45rem;
+  background: linear-gradient(135deg, #f0fdf8 0%, #e6faf5 100%);
+  color: #158a6e;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 3px rgba(31, 187, 156, 0.15);
 }
 
 .min-buy-btn:hover {
-  background: #1fbb9c;
+  background: linear-gradient(135deg, #1fbb9c 0%, #17a888 100%);
+  color: #fff !important;
+  box-shadow: 0 3px 8px rgba(31, 187, 156, 0.35);
 }
 
 .min-buy-label {
   display: block;
-  font-size: 0.8rem;
-  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+  margin-bottom: 0.2rem;
 }
 
 .min-buy-value {
   display: block;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  font-weight: 700;
 }
 
+/* ── Warning notes ──────────────────────────────────────────────────────── */
 .warning-note {
   color: #dc3545;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   margin-bottom: 0.35rem;
+  padding: 0.4rem 0.6rem;
+  background: #fff5f5;
+  border-left: 3px solid #dc3545;
+  border-radius: 0 0.35rem 0.35rem 0;
+}
+
+/* ── Download button ────────────────────────────────────────────────────── */
+.btn-outline-secondary {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.7rem;
+}
+
+/* ── Author card ────────────────────────────────────────────────────────── */
+.author-card {
+  background: linear-gradient(160deg, #f4f6f9 0%, #edf2fb 100%);
+}
+
+/* ── DT tables ──────────────────────────────────────────────────────────── */
+table.dataTable thead th {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #f8f9fa;
+  border-bottom: 2px solid #dee2e6 !important;
+}
+
+table.dataTable tbody tr:hover {
+  background: #f0f4ff !important;
+}
+
+/* ── Plotly chart spacing ───────────────────────────────────────────────── */
+.js-plotly-plot {
+  border-radius: 0 0 0.4rem 0.4rem;
 }
