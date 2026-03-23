@@ -49,7 +49,8 @@ ui <- page_navbar(
       tags$p(
         class = "text-muted small mt-2 mb-0",
         "Double-click to edit cells. Right-click a row to add or remove assets. Pie charts and target checks are now based on groups, not individual assets. Chosen Weight for Buy is used only to split each group's trades across its assets."
-      )
+      ),
+      downloadButton("download_csv", "Download Table as CSV", class = "btn-sm mt-2")
     )
   ),
 

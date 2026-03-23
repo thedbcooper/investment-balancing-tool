@@ -146,6 +146,15 @@ server <- function(input, output, session) {
       clean_input_data()
   })
 
+  output$download_csv <- downloadHandler(
+    filename = function() {
+      paste0("portfolio_", format(Sys.Date(), "%Y%m%d"), ".csv")
+    },
+    content = function(file) {
+      write_csv(values$data, file)
+    }
+  )
+
   results <- reactive({
     df <- clean_input_data(values$data)
     req(nrow(df) > 0)
