@@ -1,0 +1,49 @@
+.method-desc {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-bottom: 1rem;
+}
+
+.total-row {
+  font-size: 0.85rem;
+  color: #495057;
+  padding: 6px 4px 2px;
+}
+
+.total-row strong {
+  color: #212529;
+}
+
+.min-buy-btn {
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border: 1px solid #1fbb9c;
+  border-radius: 0.5rem;
+  background: #f8fff9;
+  color: #1fbb9c;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.min-buy-btn:hover {
+  background: #1fbb9c;
+}
+
+.min-buy-label {
+  display: block;
+  font-size: 0.8rem;
+  margin-bottom: 0.25rem;
+}
+
+.min-buy-value {
+  display: block;
+  font-size: 1.1rem;
+}
+
+.warning-note {
+  color: #dc3545;
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}

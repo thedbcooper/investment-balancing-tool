@@ -79,22 +79,30 @@ In the normal portfolio case y <= sum(delta_i+), a deflation factor is applied u
 ## CSV Format
 
 ```csv
-Asset,Ticker,Current_Value,Target_Percent
-Total US Stock Market Index,VTI,40739.2,70
-Total International Stock Index,VXUS,13062.5,20
-Bonds,BND,7019,10
+Asset,Ticker,Group,Current_Value,Target_Percent,Chosen Weight for Buy
+Total US Stock Market Index,VTI,US Stocks,40739.2,70,
+Total International Stock Index,VXUS,International Stocks,13062.5,20,
+Total Bond Market,BND,Bonds,5019,10,100
+Treasury ETF,VGIT,Bonds,2000,10,0
 ```
 
-`Target_Percent` values must sum to 100.
+- `Target_Percent` values must sum to 100.
+- `Group` is a label used to group assets (e.g. by asset class). Assets sharing a `Group` and `Target_Percent` compete for the same target allocation via the `Chosen Weight for Buy` column.
+- `Chosen Weight for Buy` is optional. When multiple assets share a target group, this sets the relative weight for how new purchases within that group are split. Leave blank to use the default.
 
 ---
 
-## Running the App
+## Running the App Locally
+
+Restore the project environment using `renv` before running the app.
 
 ```r
-# Install dependencies if needed
-install.packages(c("shiny", "DT", "tidyverse", "bslib"))
+# 1. Install renv if you don't already have it
+install.packages("renv")
 
-# Run
-shiny::runApp("app.R")
+# 2. Restore the project library from renv.lock
+renv::restore()
+
+# 3. Run the app
+shiny::runApp()
 ```
